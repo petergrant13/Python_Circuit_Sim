@@ -22,46 +22,45 @@ class Component:
         pass  # Should be implemented by subclasses
 
     def check_collision(self, mouse_pos):
-        """Check if mouse is over the component (bounding box)"""
+        """Generalized collision check for rectangular bounding box."""
         x, y = self.position
         width, height = self.size
-        return x - width // 2 <= mouse_pos[0] <= x + width // 2 and \
-               y - height // 2 <= mouse_pos[1] <= y + height // 2
+        # Creating a bounding box for collision detection
+        bounding_box = pygame.Rect(x - width // 2, y - height // 2, width, height)
+        return bounding_box.collidepoint(mouse_pos)
+        
+    def rotate(self):
+        """Rotate the component by 90 degrees."""
+        self.angle += 90
+        if self.angle == 360:
+            self.angle = 0  # Reset to 0 if it exceeds 360 degrees
 
-class Resistor:
+class Resistor(Component):
     def __init__(self, position, resistance):
-        self.position = position  # Position of the resistor's center
-        self.resistance = resistance  # Resistor value (e.g., 100Ω)
-        self.angle = 0  # Initial angle of rotation (in degrees)
-        self.width = 60  # Width of the resistor (used for scaling)
-        self.height = 20  # Height of the resistor (used for scaling)
-        self.is_dragging = False  # To track if it's being dragged
+        self.resistance = resistance
+        self.width = 60  # Set width first
+        self.height = 20  # Set height first
+        size = (self.width, self.height)  # Now create the size tuple using width and height
+        super().__init__(position, size)  # Pass size to the parent class
+
 
     def draw(self, screen):
         x, y = self.position
-        zigzag_width = self.width - 10  # Reduced width for zigzag pattern
-        zigzag_height = self.height // 2  # Zigzag "height"
+        zigzag_width = self.size[0] - 10  # Reduced width for zigzag pattern
+        zigzag_height = self.size[1] // 2  # Zigzag "height"
         num_zigzags = 8  # Number of zigzags
 
         # Create a surface to hold the rotated zigzag pattern
-        resistor_surface = pygame.Surface((zigzag_width, self.height), pygame.SRCALPHA)  # Create an alpha surface
+        resistor_surface = pygame.Surface((zigzag_width, self.size[1]), pygame.SRCALPHA)  # Create an alpha surface
 
         # Draw the zigzag resistor pattern
         for i in range(num_zigzags):
-            # For the first and last zigzag, reduce the length of the lines
-            if i == 0 or i == num_zigzags - 1:
-                start_x = i * zigzag_width // num_zigzags
-                start_y = zigzag_height // 2 if i % 2 == 0 else -zigzag_height // 2
-                end_x = (i + 1) * zigzag_width // num_zigzags
-                end_y = zigzag_height // 2 if (i + 1) % 2 == 0 else -zigzag_height // 2
-            else:
-                start_x = i * zigzag_width // num_zigzags
-                start_y = zigzag_height if i % 2 == 0 else -zigzag_height
-                end_x = (i + 1) * zigzag_width // num_zigzags
-                end_y = zigzag_height if (i + 1) % 2 == 0 else -zigzag_height
-
-            pygame.draw.line(resistor_surface, BLACK, (start_x, start_y + self.height // 2),
-                             (end_x, end_y + self.height // 2), 4)
+            start_x = i * zigzag_width // num_zigzags
+            start_y = zigzag_height if i % 2 == 0 else -zigzag_height
+            end_x = (i + 1) * zigzag_width // num_zigzags
+            end_y = zigzag_height if (i + 1) % 2 == 0 else -zigzag_height
+            pygame.draw.line(resistor_surface, BLACK, (start_x, start_y + self.size[1] // 2),
+                             (end_x, end_y + self.size[1] // 2), 4)
 
         # Rotate the resistor surface by the current angle
         rotated_resistor = pygame.transform.rotate(resistor_surface, self.angle)
@@ -72,26 +71,17 @@ class Resistor:
 
         # Draw the resistance value near the resistor
         text = FONT.render(f"{self.resistance}Ω", True, BLACK)
-        screen.blit(text, (x - text.get_width() // 2, y - self.height // 2 - 20))  # Position the text above the resistor
+        screen.blit(text, (x - text.get_width() // 2, y - self.size[1] // 2 - 20))  # Position the text above the resistor
 
         # Draw connection points (at the ends of the resistor)
         self.connection_points = self.get_connection_points()
         for point in self.connection_points:
             pygame.draw.circle(screen, BLACK, point, 3)  # Draw a small circle at each connection point
 
-    def check_collision(self, mouse_pos):
-        # Check if the mouse is over the resistor (for dragging purposes)
-        x, y = self.position
-        zigzag_width = self.width - 10
-        zigzag_height = self.height // 2
-        num_zigzags = 8
-        bounding_box = pygame.Rect(x - zigzag_width // 2, y - self.height // 2, zigzag_width, self.height)
-        return bounding_box.collidepoint(mouse_pos)
-
     def get_connection_points(self):
         """Calculate the two connection points at the ends of the resistor."""
         x, y = self.position
-        half_width = self.width // 2
+        half_width = self.size[0] // 2
         angle_rad = math.radians(self.angle)  # Convert angle to radians
 
         # Calculate the offset for both ends of the resistor
@@ -103,12 +93,6 @@ class Resistor:
         right_end = (x + x_offset, y + y_offset)
 
         return [left_end, right_end]
-
-    def rotate(self):
-        # Rotate the resistor by 90 degrees
-        self.angle += 90
-        if self.angle == 360:
-            self.angle = 0  # Reset to 0 if it exceeds 360 degrees
 
 # Battery Component Class
 class Battery(Component):
@@ -142,17 +126,21 @@ class Wire:
         self.end = end
 
     def check_collision(self, mouse_pos):
-        """Check if the mouse is near the wire."""
-        # Allow some tolerance for clicking near the wire
-        tolerance = 5
-        line_length = pygame.math.Vector2(self.end) - pygame.math.Vector2(self.start)
-        line_length = line_length.length()
-        
-        # Check if the point is close to the line
-        dist = pygame.math.Vector2(self.start).distance_to(mouse_pos)
-        
-        # Check if the mouse click is within tolerance distance from the wire
-        return dist <= line_length + tolerance
+        """Check if the mouse is near the wire (line segment)."""
+        # Create vector representations of the wire's start and end points
+        line_start = pygame.math.Vector2(self.start)
+        line_end = pygame.math.Vector2(self.end)
+        mouse_pos = pygame.math.Vector2(mouse_pos)
+
+        # The line length
+        line_length = line_start.distance_to(line_end)
+
+        # The distance from the mouse position to the line
+        # This function calculates the perpendicular distance from the mouse point to the line segment
+        distance = line_start.distance_to(mouse_pos) + line_end.distance_to(mouse_pos) - line_length
+
+        # If the distance is small enough, consider it a "collision"
+        return abs(distance) < 5  # This threshold (5) is the buffer zone, similar to tolerance
 
 
 # Probe Component Class

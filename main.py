@@ -142,7 +142,7 @@ def main():
         # Highlight the selected component for deletion
         if selected_component:
             x, y = selected_component.position
-            width, height = selected_component.width, selected_component.height  # Use width and height here
+            width, height = selected_component.size
             pygame.draw.rect(screen, RED, (x - width // 2, y - height // 2, width, height), 2)
 
         # Draw the selected wire in a different color
