@@ -24,4 +24,8 @@ class CircuitWindow(QMainWindow):
         resistor = ResistorSymbol()
         self.scene.addItem(resistor)
         resistor.setPos(0, 0)
-
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_R:
+            for item in self.scene.selectedItems():
+                if hasattr(item, "rotate"):
+                    item.rotate()

@@ -5,6 +5,18 @@ from PySide6.QtCore import QRectF, Qt
 
 
 class ResistorSymbol(QGraphicsItem):
+    def __init__(self):
+        super().__init__()
+        self.setFlags(
+            QGraphicsItem.ItemIsMovable |
+            QGraphicsItem.ItemIsSelectable
+        )
+        self.rotation_angle = 0  # Track current rotation
+
+    def rotate(self):
+        self.rotation_angle = (self.rotation_angle + 90) % 360
+        self.setRotation(self.rotation_angle)
+
     def boundingRect(self):
         return QRectF(-30, -10, 60, 20)
 
