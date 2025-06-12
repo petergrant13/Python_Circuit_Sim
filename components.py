@@ -1,1 +1,1 @@
-# foo
+# This file will have component info -- may be best as a json???
