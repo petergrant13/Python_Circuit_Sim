@@ -1,7 +1,7 @@
 # This is the GUI file
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsView, QMainWindow,
-    QPushButton, QWidget, QVBoxLayout, QHBoxLayout
+    QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QGraphicsLineItem
 )
 from PySide6.QtGui import QPainter
 from PySide6.QtCore import Qt
@@ -68,6 +68,11 @@ class CircuitWindow(QMainWindow):
             for item in self.scene.selectedItems():
                 if hasattr(item, "rotate"):
                     item.rotate()
+
+        elif event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            for item in self.scene.selectedItems():
+                if isinstance(item, QGraphicsLineItem):
+                    self.scene.removeItem(item)
 
     def toggle_wire_mode(self, checked):
         self.wire_mode = checked
