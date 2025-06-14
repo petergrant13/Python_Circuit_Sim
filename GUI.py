@@ -1,11 +1,12 @@
+# This is the GUI file
 from PySide6.QtWidgets import (
     QGraphicsScene, QGraphicsView, QMainWindow,
-    QPushButton, QWidget, QVBoxLayout
+    QPushButton, QWidget, QVBoxLayout, QHBoxLayout
 )
 from PySide6.QtGui import QPainter
 from PySide6.QtCore import Qt
-
-from components import ResistorSymbol, VoltageSourceSymbol
+from wire_drawing import CircuitScene
+from components import ResistorSymbol, VoltageSourceSymbol, GroundSymbol
 
 
 class CircuitWindow(QMainWindow):
@@ -16,23 +17,19 @@ class CircuitWindow(QMainWindow):
 
         # Central widget and layout
         central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        layout_buttons = QHBoxLayout()
         self.setCentralWidget(central_widget)
 
         # Set up the scene and view
-        self.scene = QGraphicsScene()
+        self.scene = CircuitScene()
         self.scene.setSceneRect(-400, -300, 800, 600)
         self.view = QGraphicsView(self.scene)
         self.view.setBackgroundBrush(Qt.white)
         self.view.setRenderHint(QPainter.Antialiasing)
 
-        # Add an initial resistor symbol to the scene
-        self.resistor_count = 1
-        resistor = ResistorSymbol(f"R{self.resistor_count}", 100)
-        self.scene.addItem(resistor)
-        resistor.setPos(0, 0)
-
-        # Initialize voltage source count
+        # Start counters
+        self.resistor_count = 0
         self.voltage_count = 0
 
         # Buttons
@@ -42,20 +39,33 @@ class CircuitWindow(QMainWindow):
         add_voltage_button = QPushButton("Add Voltage Source")
         add_voltage_button.clicked.connect(self.add_voltage_source)
 
+        add_ground_button = QPushButton("Add GND")
+        add_ground_button.clicked.connect(self.add_ground)
+
+
         check_button = QPushButton("Check Circuit")
         check_button.clicked.connect(self.check_circuit)
 
         # Add widgets to layout
-        layout.addWidget(self.view)
-        layout.addWidget(add_resistor_button)
-        layout.addWidget(add_voltage_button)
-        layout.addWidget(check_button)
+        main_layout.addWidget(self.view)
+        main_layout.addLayout(layout_buttons)
+
+        layout_buttons.addWidget(add_resistor_button)
+        layout_buttons.addWidget(add_voltage_button)
+        layout_buttons.addWidget(add_ground_button)
+        layout_buttons.addWidget(check_button)
+
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_R:
             for item in self.scene.selectedItems():
                 if hasattr(item, "rotate"):
                     item.rotate()
+
+    def add_ground(self):
+        ground = GroundSymbol()
+        ground.setPos(0, 100)
+        self.scene.addItem(ground)
 
     def add_resistor(self):
         self.resistor_count += 1

@@ -1,3 +1,5 @@
+# This file has all the component class creators
+
 from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, QInputDialog, QGraphicsLineItem
 from PySide6.QtGui import QPainter, QPen, QFont
 from PySide6.QtCore import QRectF, Qt, QPointF
@@ -21,6 +23,13 @@ class CircuitComponent(QGraphicsItem):
         self.text_item.setDefaultTextColor(Qt.darkBlue)
         self.text_item.setPos(-20, -40)
         self.text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
+
+    def terminals(self) -> list[QPointF]:
+        # Default to horizontal layout — override if needed
+        pos = self.scenePos()
+        dx = 30
+        return [pos + QPointF(-dx, 0), pos + QPointF(dx, 0)]
+
 
     def label_text(self):
         return f"{self.label} {self.value}{self.value_unit}"
@@ -47,14 +56,22 @@ class Wire(QGraphicsLineItem):
         self.setPen(QPen(Qt.black, 2))
         self.start_item = start_item
         self.end_item = end_item
+        self.start_terminal = None        # Point on start component
+        self.floating_end_pos = None      # Only used during dragging
+        self.setZValue(-1)
         self.update_position()
-        self.setZValue(-1)  # Draw behind components
 
     def update_position(self):
-        if self.start_item and self.end_item:
-            p1 = self.start_item.scenePos()
-            p2 = self.end_item.scenePos()
+        if self.start_item:
+            p1 = self.start_terminal or self.start_item.terminals()[1]
+            if self.end_item:
+                p2 = self.end_item.terminals()[0]
+            elif self.floating_end_pos:
+                p2 = self.floating_end_pos
+            else:
+                return  # Can't draw line
             self.setLine(p1.x(), p1.y(), p2.x(), p2.y())
+
 
 class Node:
     def __init__(self, position: QPointF):
@@ -67,6 +84,29 @@ class Node:
 
     def __repr__(self):
         return f"Node(pos={self.position}, components={[c.label for c in self.connected_components]})"
+
+class GroundSymbol(CircuitComponent):
+    def __init__(self, label="GND"):
+        super().__init__(label, 0, "")
+        self.text_item.setVisible(False) 
+
+    def boundingRect(self):
+        return QRectF(-10, -10, 20, 20)
+
+    def paint(self, painter, option, widget=None):
+        pen = QPen(Qt.black, 2)
+        painter.setPen(pen)
+
+        # Vertical line
+        painter.drawLine(0, -10, 0, 0)
+        # Three horizontal lines
+        painter.drawLine(-6, 0, 6, 0)
+        painter.drawLine(-4, 3, 4, 3)
+        painter.drawLine(-2, 6, 2, 6)
+
+    def terminals(self) -> list[QPointF]:
+        return [self.scenePos() + QPointF(0, -10)]
+    
 
 class ResistorSymbol(CircuitComponent):
     def __init__(self, label="R1", resistance=100):
@@ -116,5 +156,5 @@ class VoltageSourceSymbol(CircuitComponent):
 
         # Plus and minus signs
         painter.setFont(self.text_item.font())
-        painter.drawText(-5, -25, "+")
-        painter.drawText(-4, 50, "−")
+        painter.drawText(-3, -10, "+")
+        painter.drawText(-3, 10, "−")
