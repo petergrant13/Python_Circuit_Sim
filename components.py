@@ -1,6 +1,6 @@
 # This file has all the component class creators
 
-from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, QInputDialog, QGraphicsLineItem
+from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, QInputDialog, QGraphicsLineItem, QMainWindow
 from PySide6.QtGui import QPainter, QPen, QFont
 from PySide6.QtCore import QRectF, Qt, QPointF
 
@@ -25,10 +25,10 @@ class CircuitComponent(QGraphicsItem):
         self.text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
 
     def terminals(self) -> list[QPointF]:
-        # Default to horizontal layout — override if needed
         pos = self.scenePos()
         dx = 30
-        return [pos + QPointF(-dx, 0), pos + QPointF(dx, 0)]
+        dy = 30
+        return [pos + QPointF(-dx, -dy), pos + QPointF(dx, dy)]
 
 
     def label_text(self):
@@ -49,28 +49,6 @@ class CircuitComponent(QGraphicsItem):
         self.label = new_label
         self.value = new_value
         self.text_item.setPlainText(self.label_text())
-
-class Wire(QGraphicsLineItem):
-    def __init__(self, start_item, end_item=None):
-        super().__init__()
-        self.setPen(QPen(Qt.black, 2))
-        self.start_item = start_item
-        self.end_item = end_item
-        self.start_terminal = None        # Point on start component
-        self.floating_end_pos = None      # Only used during dragging
-        self.setZValue(-1)
-        self.update_position()
-
-    def update_position(self):
-        if self.start_item:
-            p1 = self.start_terminal or self.start_item.terminals()[1]
-            if self.end_item:
-                p2 = self.end_item.terminals()[0]
-            elif self.floating_end_pos:
-                p2 = self.floating_end_pos
-            else:
-                return  # Can't draw line
-            self.setLine(p1.x(), p1.y(), p2.x(), p2.y())
 
 
 class Node:

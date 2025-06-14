@@ -1,88 +1,73 @@
-# This has a bunch of stuff to handle drawing wires and making connections
-
+# wire_drawing.py
 from PySide6.QtWidgets import QGraphicsScene
 from PySide6.QtCore import Qt, QPointF
-from components import CircuitComponent, Node, Wire
+from PySide6.QtGui import QPen, QColor
 
 
 class CircuitScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
-        self.drawing_wire = False
-        self.temp_wire = None
-        self.start_item = None
-        self.start_terminal = None
-        self.nodes = []
+        self.wire_mode = False
+        self.start_point = None
+        self.preview_line1 = None
+        self.preview_line2 = None
+
+    def set_wire_mode(self, enabled: bool):
+        self.wire_mode = enabled
+        if not enabled:
+            self.start_point = None
+            self.remove_preview()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            clicked_pos = event.scenePos()
-            comp, terminal = self.find_terminal_near(clicked_pos)
-            if comp:
-                self.start_item = comp
-                self.start_terminal = terminal
-                self.temp_wire = Wire(comp)
-                self.temp_wire.start_terminal = terminal
-                self.temp_wire.floating_end_pos = terminal
-                self.temp_wire.update_position()
-                self.addItem(self.temp_wire)
-                self.drawing_wire = True
-            else:
-                super().mousePressEvent(event)
+        if not self.wire_mode:
+            return super().mousePressEvent(event)
+
+        point = event.scenePos()
+        if self.start_point is None:
+            self.start_point = point
+        else:
+            self.draw_L_wire(self.start_point, point)
+            self.start_point = None
+            self.remove_preview()
 
     def mouseMoveEvent(self, event):
-        if self.drawing_wire and self.temp_wire:
-            line = self.temp_wire.line()
-            self.temp_wire.setLine(
-                line.x1(), line.y1(),
-                event.scenePos().x(), event.scenePos().y()
-            )
-            self.temp_wire.floating_end_pos = event.scenePos()
-            self.temp_wire.update_position()
+        if self.wire_mode and self.start_point:
+            self.update_preview(self.start_point, event.scenePos())
         else:
             super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event):
-        if self.drawing_wire and self.start_item:
-            comp, terminal = self.find_terminal_near(event.scenePos())
-            if comp and comp != self.start_item:
-                # Complete the wire
-                wire = Wire(self.start_item, comp)
-                wire.start_terminal = self.start_terminal
-                wire.update_position()
-                self.addItem(wire)
+    def draw_L_wire(self, start, end):
+        mid1 = QPointF(end.x(), start.y())
+        mid2 = QPointF(start.x(), end.y())
 
-
-                # Create or use existing nodes
-                node_start = self.get_or_create_node(self.start_terminal)
-                node_end = self.get_or_create_node(terminal)
-
-                node_start.connect(self.start_item)
-                node_end.connect(comp)
-            if self.temp_wire:
-                self.removeItem(self.temp_wire)
-            self.reset_wire_drawing()
+        if (start - mid1).manhattanLength() + (mid1 - end).manhattanLength() < \
+           (start - mid2).manhattanLength() + (mid2 - end).manhattanLength():
+            self.addLine(start.x(), start.y(), mid1.x(), mid1.y(), QPen(Qt.black, 2))
+            self.addLine(mid1.x(), mid1.y(), end.x(), end.y(), QPen(Qt.black, 2))
         else:
-            super().mouseReleaseEvent(event)
+            self.addLine(start.x(), start.y(), mid2.x(), mid2.y(), QPen(Qt.black, 2))
+            self.addLine(mid2.x(), mid2.y(), end.x(), end.y(), QPen(Qt.black, 2))
 
-    def reset_wire_drawing(self):
-        self.drawing_wire = False
-        self.temp_wire = None
-        self.start_item = None
-        self.start_terminal = None
+    def update_preview(self, start, current):
+        self.remove_preview()
 
-    def find_terminal_near(self, pos: QPointF, threshold=10) -> tuple[CircuitComponent, QPointF] | tuple[None, None]:
-        for item in self.items(pos):
-            if isinstance(item, CircuitComponent):
-                for term in item.terminals():
-                    if (term - pos).manhattanLength() < threshold:
-                        return item, term
-        return None, None
+        mid1 = QPointF(current.x(), start.y())
+        mid2 = QPointF(start.x(), current.y())
 
-    def get_or_create_node(self, pos: QPointF) -> Node:
-        for node in self.nodes:
-            if (node.position - pos).manhattanLength() < 5:
-                return node
-        new_node = Node(pos)
-        self.nodes.append(new_node)
-        return new_node
+        if (start - mid1).manhattanLength() + (mid1 - current).manhattanLength() < \
+           (start - mid2).manhattanLength() + (mid2 - current).manhattanLength():
+            p1, p2 = (start, mid1), (mid1, current)
+        else:
+            p1, p2 = (start, mid2), (mid2, current)
+
+        pen = QPen(QColor("gray"), 1, Qt.DashLine)
+        self.preview_line1 = self.addLine(p1[0].x(), p1[0].y(), p1[1].x(), p1[1].y(), pen)
+        self.preview_line2 = self.addLine(p2[0].x(), p2[0].y(), p2[1].x(), p2[1].y(), pen)
+
+    def remove_preview(self):
+        if self.preview_line1:
+            self.removeItem(self.preview_line1)
+            self.preview_line1 = None
+        if self.preview_line2:
+            self.removeItem(self.preview_line2)
+            self.preview_line2 = None

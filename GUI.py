@@ -33,6 +33,13 @@ class CircuitWindow(QMainWindow):
         self.voltage_count = 0
 
         # Buttons
+        self.wire_mode = False
+        toggle_wire_button = QPushButton("Draw Wire")
+        toggle_wire_button.setCheckable(True)
+        toggle_wire_button.toggled.connect(self.toggle_wire_mode)
+        layout_buttons.addWidget(toggle_wire_button)
+
+
         add_resistor_button = QPushButton("Add Resistor")
         add_resistor_button.clicked.connect(self.add_resistor)
 
@@ -61,6 +68,11 @@ class CircuitWindow(QMainWindow):
             for item in self.scene.selectedItems():
                 if hasattr(item, "rotate"):
                     item.rotate()
+
+    def toggle_wire_mode(self, checked):
+        self.wire_mode = checked
+        self.scene.set_wire_mode(checked)
+
 
     def add_ground(self):
         ground = GroundSymbol()
