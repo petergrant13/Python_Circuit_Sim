@@ -108,3 +108,7 @@ class CircuitWindow(QMainWindow):
                 print(f"Resistor: Label={item.label}, Resistance={item.value}Ω")
             elif isinstance(item, VoltageSourceSymbol):
                 print(f"Voltage Source: Label={item.label}, Voltage={item.value}V")
+                print("== Nodes ==")
+        for node in self.scene.node_manager.nodes:
+            print(node)
+

@@ -25,10 +25,9 @@ class CircuitComponent(QGraphicsItem):
         self.text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
 
     def terminals(self) -> list[QPointF]:
-        pos = self.scenePos()
-        dx = 30
-        dy = 30
-        return [pos + QPointF(-dx, -dy), pos + QPointF(dx, dy)]
+        # Define terminals in local coordinates
+        local_terminals = [QPointF(-30, 0), QPointF(30, 0)]  # override per component as needed
+        return [self.mapToScene(p) for p in local_terminals]
 
 
     def label_text(self):
@@ -50,18 +49,6 @@ class CircuitComponent(QGraphicsItem):
         self.value = new_value
         self.text_item.setPlainText(self.label_text())
 
-
-class Node:
-    def __init__(self, position: QPointF):
-        self.position = position
-        self.connected_components = []
-
-    def connect(self, component):
-        if component not in self.connected_components:
-            self.connected_components.append(component)
-
-    def __repr__(self):
-        return f"Node(pos={self.position}, components={[c.label for c in self.connected_components]})"
 
 class GroundSymbol(CircuitComponent):
     def __init__(self, label="GND"):
