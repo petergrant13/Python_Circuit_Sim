@@ -62,6 +62,7 @@ class CircuitScene(QGraphicsScene):
         else:
             super().mouseMoveEvent(event)
 
+    # This function handles a lot -- like drawing wires, snapping to components
     def draw_L_wire(self, start, end, threshold=5):
         # Snap start and end to nearby terminals if close
         start_snap = self.find_near_terminal(start) or start
@@ -129,6 +130,8 @@ class Node:
     def __init__(self):
         self.points: list[QPointF] = []
         self.components: list[tuple[object, int]] = []  # (component, terminal_index)
+        self.id: int = -1
+        self.is_ground: bool = False
 
     def add_terminal(self, point: QPointF, component, terminal_index: int):
         self.points.append(point)
@@ -154,3 +157,23 @@ class NodeManager:
     def connect_terminal(self, component, terminal_index: int, terminal_pos: QPointF):
         node = self.find_or_create_node(terminal_pos)
         node.add_terminal(terminal_pos, component, terminal_index)
+
+    def finalize_nodes(self):
+        for i, node in enumerate(self.nodes):
+            node.id = i
+            node.is_ground = any(isinstance(c, GroundSymbol) for (c, _) in node.components)
+        ground_nodes = [node for node in self.scene.node_manager.nodes if node.is_ground]
+        if not ground_nodes:
+            print("Error: No ground node found.")
+            return
+
+        # Assign ground to node 0
+        ground_node = ground_nodes[0]
+        ground_node.id = 0
+
+        # Shift all other node IDs accordingly
+        other_nodes = [n for n in self.scene.node_manager.nodes if n != ground_node]
+        for i, node in enumerate(other_nodes, start=1):
+            node.id = i
+
+
