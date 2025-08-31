@@ -1,6 +1,5 @@
-# This file has all the component class creators
-
-from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, QInputDialog, QGraphicsLineItem, QMainWindow
+# components.py
+from PySide6.QtWidgets import QGraphicsTextItem, QGraphicsItem, QInputDialog
 from PySide6.QtGui import QPainter, QPen, QFont
 from PySide6.QtCore import QRectF, Qt, QPointF
 
@@ -25,10 +24,9 @@ class CircuitComponent(QGraphicsItem):
         self.text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
 
     def terminals(self) -> list[QPointF]:
-        # Define terminals in local coordinates
-        local_terminals = [QPointF(-30, 0), QPointF(30, 0)]  # override per component as needed
+        # Default 2-terminal part, horizontal
+        local_terminals = [QPointF(-30, 0), QPointF(30, 0)]
         return [self.mapToScene(p) for p in local_terminals]
-
 
     def label_text(self):
         return f"{self.label} {self.value}{self.value_unit}"
@@ -38,9 +36,14 @@ class CircuitComponent(QGraphicsItem):
         self.setRotation(self.rotation_angle)
 
     def mouseDoubleClickEvent(self, event):
-        new_label, ok1 = QInputDialog.getText(None, "Edit Label", "New Label:", text=self.label)
-        new_value, ok2 = QInputDialog.getDouble(None, f"Edit {self.value_unit}", f"Value ({self.value_unit}):", value=self.value, decimals=2)
+        # Make dialogs modal to the main window if possible
+        parent = None
+        s = self.scene()
+        if s and s.views():
+            parent = s.views()[0].window()
 
+        new_label, ok1 = QInputDialog.getText(parent, "Edit Label", "New Label:", text=self.label)
+        new_value, ok2 = QInputDialog.getDouble(parent, f"Edit {self.value_unit}", f"Value ({self.value_unit}):", value=self.value, decimals=2)
         if ok1 and ok2:
             self.update_label(new_label, new_value)
 
@@ -51,9 +54,11 @@ class CircuitComponent(QGraphicsItem):
 
 
 class GroundSymbol(CircuitComponent):
+    is_ground_symbol = True  # used by NodeManager without cross-imports
+
     def __init__(self, label="GND"):
         super().__init__(label, 0, "")
-        self.text_item.setVisible(False) 
+        self.text_item.setVisible(False)
 
     def boundingRect(self):
         return QRectF(-10, -10, 20, 20)
@@ -61,17 +66,15 @@ class GroundSymbol(CircuitComponent):
     def paint(self, painter, option, widget=None):
         pen = QPen(Qt.black, 2)
         painter.setPen(pen)
-
-        # Vertical line
-        painter.drawLine(0, -10, 0, 0)
-        # Three horizontal lines
-        painter.drawLine(-6, 0, 6, 0)
+        painter.drawLine(0, -10, 0, 0)    # Vertical
+        painter.drawLine(-6, 0, 6, 0)     # Ground bars
         painter.drawLine(-4, 3, 4, 3)
         painter.drawLine(-2, 6, 2, 6)
 
     def terminals(self) -> list[QPointF]:
+        # Single terminal at the top of the symbol
         return [self.scenePos() + QPointF(0, -10)]
-    
+
 
 class ResistorSymbol(CircuitComponent):
     def __init__(self, label="R1", resistance=100):
@@ -83,18 +86,13 @@ class ResistorSymbol(CircuitComponent):
     def paint(self, painter, option, widget=None):
         pen = QPen(Qt.black, 2)
         painter.setPen(pen)
-
-        # Draw horizontal lines before/after the zigzag
         painter.drawLine(-30, 0, -15, 0)
         painter.drawLine(15, 0, 30, 0)
-
-        # Draw zigzag
         zigzag_points = [
             (-15, 0), (-12, -10), (-9, 10), (-6, -10),
             (-3, 10), (0, -10), (3, 10), (6, -10),
             (9, 10), (12, -10), (15, 0)
         ]
-
         for i in range(len(zigzag_points) - 1):
             start = zigzag_points[i]
             end = zigzag_points[i + 1]
@@ -107,19 +105,18 @@ class VoltageSourceSymbol(CircuitComponent):
 
     def boundingRect(self):
         return QRectF(-20, -40, 40, 80)
-    
+
     def paint(self, painter, option, widget=None):
         pen = QPen(Qt.black, 2)
         painter.setPen(pen)
-
-        # Vertical wires
         painter.drawLine(0, -40, 0, -20)
         painter.drawLine(0, 20, 0, 40)
-
-        # Circle for the voltage source body
         painter.drawEllipse(-20, -20, 40, 40)
-
-        # Plus and minus signs
         painter.setFont(self.text_item.font())
         painter.drawText(-3, -10, "+")
         painter.drawText(-3, 10, "−")
+
+    def terminals(self) -> list[QPointF]:
+        # Terminals at the ends of the vertical wires
+        local_terminals = [QPointF(0, -40), QPointF(0, 40)]
+        return [self.mapToScene(p) for p in local_terminals]

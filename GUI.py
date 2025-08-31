@@ -1,12 +1,13 @@
-# This is the GUI file
 from PySide6.QtWidgets import (
-    QGraphicsScene, QGraphicsView, QMainWindow,
-    QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QGraphicsLineItem
+    QGraphicsView, QMainWindow,
+    QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
+    QGraphicsLineItem, QMessageBox, QToolBar
 )
 from PySide6.QtGui import QPainter
 from PySide6.QtCore import Qt
 from wire_drawing import CircuitScene
 from components import ResistorSymbol, VoltageSourceSymbol, GroundSymbol
+from solver import CircuitSolver
 
 
 class CircuitWindow(QMainWindow):
@@ -21,24 +22,26 @@ class CircuitWindow(QMainWindow):
         layout_buttons = QHBoxLayout()
         self.setCentralWidget(central_widget)
 
-        # Set up the scene and view
+        # Toolbar (create it!)
+        toolbar = QToolBar("Main Toolbar")
+        self.addToolBar(toolbar)
+
+        # Scene and view
         self.scene = CircuitScene()
         self.scene.setSceneRect(-400, -300, 800, 600)
         self.view = QGraphicsView(self.scene)
         self.view.setBackgroundBrush(Qt.white)
         self.view.setRenderHint(QPainter.Antialiasing)
 
-        # Start counters
+        # Counters
         self.resistor_count = 0
         self.voltage_count = 0
 
         # Buttons
-        self.wire_mode = False
         toggle_wire_button = QPushButton("Draw Wire")
         toggle_wire_button.setCheckable(True)
         toggle_wire_button.toggled.connect(self.toggle_wire_mode)
         layout_buttons.addWidget(toggle_wire_button)
-
 
         add_resistor_button = QPushButton("Add Resistor")
         add_resistor_button.clicked.connect(self.add_resistor)
@@ -49,35 +52,34 @@ class CircuitWindow(QMainWindow):
         add_ground_button = QPushButton("Add GND")
         add_ground_button.clicked.connect(self.add_ground)
 
-
         check_button = QPushButton("Check Circuit")
         check_button.clicked.connect(self.check_circuit)
 
-        # Add widgets to layout
+        # ✅ Solve button goes in the toolbar
+        solve_button = QPushButton("Solve Circuit")
+        solve_button.clicked.connect(self.solve_circuit)
+        toolbar.addWidget(solve_button)
+
+        # Layout
         main_layout.addWidget(self.view)
         main_layout.addLayout(layout_buttons)
-
         layout_buttons.addWidget(add_resistor_button)
         layout_buttons.addWidget(add_voltage_button)
         layout_buttons.addWidget(add_ground_button)
         layout_buttons.addWidget(check_button)
-
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_R:
             for item in self.scene.selectedItems():
                 if hasattr(item, "rotate"):
                     item.rotate()
-
         elif event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             for item in self.scene.selectedItems():
                 if isinstance(item, QGraphicsLineItem):
                     self.scene.removeItem(item)
 
     def toggle_wire_mode(self, checked):
-        self.wire_mode = checked
         self.scene.set_wire_mode(checked)
-
 
     def add_ground(self):
         ground = GroundSymbol()
@@ -89,7 +91,6 @@ class CircuitWindow(QMainWindow):
         label = f"R{self.resistor_count}"
         resistance = 100
         resistor = ResistorSymbol(label, resistance)
-        # Position new resistor with some spacing
         resistor.setPos(-100 + 40 * self.resistor_count, -100)
         self.scene.addItem(resistor)
 
@@ -108,7 +109,34 @@ class CircuitWindow(QMainWindow):
                 print(f"Resistor: Label={item.label}, Resistance={item.value}Ω")
             elif isinstance(item, VoltageSourceSymbol):
                 print(f"Voltage Source: Label={item.label}, Voltage={item.value}V")
-                print("== Nodes ==")
+
+        self.scene.node_manager.finalize_nodes()
+        print("== Nodes ==")
         for node in self.scene.node_manager.nodes:
             print(node)
 
+    def solve_circuit(self):
+        self.scene.node_manager.finalize_nodes()
+
+        # Collect components
+        components = []
+        for item in self.scene.items():
+            if isinstance(item, (ResistorSymbol, VoltageSourceSymbol)):
+                components.append(item)
+
+        # Use solver
+        try:
+            solver = CircuitSolver(components, self.scene.node_manager.nodes)
+            node_voltages, branch_currents = solver.solve()
+
+            msg = "Node Voltages:\n"
+            for nid, v in node_voltages.items():
+                msg += f"  Node {nid}: {v:.3f} V\n"
+            msg += "\nBranch Currents:\n"
+            for name, i in branch_currents.items():
+                msg += f"  {name}: {i:.3f} A\n"
+
+            QMessageBox.information(self, "Circuit Solution", msg)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Solve Error", str(e))
